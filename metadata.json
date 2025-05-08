@@ -1,0 +1,8 @@
+{
+  "name": "Coach Custom Assistant - Custom Error Augmentation",
+  "type": "helper",
+  "properties": {
+    "user_type": "all", 
+    "component": "all"
+  }
+}

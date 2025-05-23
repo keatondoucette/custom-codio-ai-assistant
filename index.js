@@ -3,29 +3,19 @@
 (async function(codioIDE, window) {
   
   // Refer to Anthropic's guide on system prompts: https://docs.anthropic.com/claude/docs/system-prompts
-  const systemPrompt = `You are a helpful assistant helping students understand programming error messages.
+  const systemPrompt = `You are a helpful assistant helping students style their code properly.
 
-You will be provided with a programming error message in the <error_message> tag.
+You will be provided with a brief assignment description in <assignment> as well as the code in <code>.
 
-If the error message does not match any of the generalized ones:
-- Carefully review the <assignment> and <code>, if provided, to understand the context of the error
-- Explain what is causing the error, and provide possible fixes and solutions as code snippets in markdown format
-- If relevant, mention any common misconceptions that may be contributing to the student's error
+Carefully review the <code> and <assignment> and look for inproper style.
+After looking for inproper style, then
+- Explain why the style is incorrect, and provide possible fixes and solutions as code snippets in markdown format
+- If relevant, mention any common misconceptions that may be contributing to the student's inproper style
 - When referring to code in your explanation, use markdown syntax - wrap inline code with \` and
-multiline code with \`\`\`
-  `
-    
-  codioIDE.onErrorState((isError, error) => {
-    console.log('codioIDE.onErrorState', {isError, error})
-    if (isError) {
-      codioIDE.coachBot.showTooltip("I can help explain this error...", () => {
-        codioIDE.coachBot.open({id: "errorAugmentButton", params: "tooltip"})
-      })
-    }
-  })
+multiline code with \`\`\` `
 
   // register(id: unique button id, name: name of button visible in Coach, function: function to call when button is clicked) 
-  codioIDE.coachBot.register("errorAugmentButton", "Test Custom Error Explanation", onButtonPress)
+  codioIDE.coachBot.register("syntaxFix", "Explain any syntax errors", onButtonPress)
 
   async function onButtonPress(params) {
     // Function that automatically collects all available context 
@@ -36,27 +26,21 @@ multiline code with \`\`\`
 
     let input
 
-    if (params == "tooltip") { 
-      input = context.error.text
-      codioIDE.coachBot.write(context.error.text, codioIDE.coachBot.MESSAGE_ROLES.USER)
-    } else {
-
-      try {
-        input = await codioIDE.coachBot.input("Please paste the error message you want me to explain!")
-      }  catch (e) {
-          if (e.message == "Cancelled") {
-            codioIDE.coachBot.write("Please feel free to have any other error messages explained!")
-            codioIDE.coachBot.showMenu()
-            return
-          }
-      }
+    try {
+      input = context.files[0]
+    } 
+    catch (e) {
+        if (e.message == "Cancelled") {
+          codioIDE.coachBot.write("Please feel free to have any other error messages explained!")
+          codioIDE.coachBot.showMenu()
+          return
+        }
     }
    
-    
     console.log(input)
     const valPrompt = `<Instructions>
 
-Please determine whether the following text appears to be a programming error message or not:
+Please determine whether the following text appears to have style errors:
 
 <text>
 ${input}
@@ -64,20 +48,30 @@ ${input}
 
 Output your final Yes or No answer in JSON format with the key 'answer'
 
-Focus on looking for key indicators that suggest the text is an error message, such as:
+Focus on looking for anything in the code that appears to be not styled correctly. Do not look for logic errors.
 
-- Words like "error", "exception", "stack trace", "traceback", etc.
+- Two tabs for an indent instead of one
 
-- Line numbers, file names, or function/method names
+- An else on the same line as the closing if bracket }
 
-- Language that sounds like it is reporting a problem or issue
+- An open bracket { on a new line
 
-- Language that sounds like it is providing feedback
+- No spaces in between arithmetic operators
 
-- Technical jargon related to coding/programming
+- Single lines of code being over 30 characters
 
-If you don't see clear signs that it is an error message, assume it is not. Only answer "Yes" if you are quite confident it is an error message. 
-If it is not a traditional error message, only answer "Yes" if it sounds like it is providing feedback as part of an automated grading system.
+- Comments are not useful
+
+- Lack of comments on complicated parts of code
+
+- Method is too long
+
+- Variable name is not camelCase or UPPER_SNAKE_CASE
+
+- Syntax errors such as a missing comma, closing bracket ) or }
+
+If you don't see clear, with over 90% certainty, that this code has improper style, assume it does not not. Only answer "Yes" if you are quite 
+confident it has style errors.
 
 </Instructions>"`
 
@@ -88,28 +82,46 @@ If it is not a traditional error message, only answer "Yes" if it sounds like it
 
     if (validation_result.result.includes("Yes")) {
         //Define your assistant's userPrompt - this is where you will provide all the context you collected along with the task you want the LLM to generate text for.
-        const userPrompt = `Here is the error message:
+        const userPrompt = `Here is the current code:
 
-<error_message>
+<current_code>
 ${input}
-</error_message>
+</current_code>
  Here is the description of the programming assignment the student is working on:
 
 <assignment>
 ${context.guidesPage.content}
 </assignment>
 
-Here is the student's current code:
+Here is the list of guidelines:
 
-<current_code>
-${context.files[0]}
-</current_code> 
+<guidelines>
+- Two tabs for an indent instead of one
 
-If <assignment> and <current_code> are empty, assume that they're not available. 
-With the available context, follow the guidelines and respond with either the teacher written explanation or your own if it doesn't match any <generalized_errors>
+- An else on the same line as the closing if bracket }
 
-If generating your own explanation, make sure it is not longer than 2-3 sentences, and double check that it does not suggest any fixes or solutions. 
-The explanation should only describe the cause of the error. Do not tell the student whether or not it matches. Just provide the explanation in either case only.`
+- An open bracket { on a new line
+
+- No spaces in between arithmetic operators
+
+- Single lines of code being over 30 characters
+
+- Comments are not useful
+
+- Lack of comments on complicated parts of code
+
+- Method is too long
+
+- Variable name is not camelCase or UPPER_SNAKE_CASE
+
+- Syntax errors such as a missing comma, closing bracket ) or }
+</guidelines> 
+
+If <assignment> and <current_code> are empty, assume that they're not available and respond with an error.
+With the available context, follow the guidelines and respond with either the why the style in incorrect.
+
+If generating your own explanation, make sure it is not longer than 2-3 sentences. 
+The explanation should only describe what is wrong with the style and what rule it breaks.`
 
       const result = await codioIDE.coachBot.ask({
         systemPrompt: systemPrompt,
@@ -117,7 +129,7 @@ The explanation should only describe the cause of the error. Do not tell the stu
       })
     }
     else {
-        codioIDE.coachBot.write("This doesn't look like an error. I'm sorry, I can only help you by explaining programming error messages.")
+        codioIDE.coachBot.write("This code doesn't have any style errors.")
         codioIDE.coachBot.showMenu()
     }
   }

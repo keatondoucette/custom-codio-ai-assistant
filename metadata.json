@@ -1,8 +1,8 @@
 {
-  "name": "Coach Custom Assistant - Fixing Style",
+  "name": "Dal AI Coding Assistant",
   "type": "helper",
   "properties": {
-    "user_type": "all", 
+    "user_type": "all",
     "component": "all"
   }
 }

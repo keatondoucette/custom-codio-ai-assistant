@@ -269,7 +269,7 @@ Phrase your explanation directly addressing the student as 'you'.`;
   // === Tooltip-triggered error help ===
   codioIDE.onErrorState((isError, error) => {
     if (isError) {
-      coachAPI.showTooltip("I can help explain this concept...", () => {
+      coachAPI.showTooltip("I can help explain this error...", () => {
         coachAPI.open({ id: "customErrorTooltip", params: "tooltip" });
       });
     }
